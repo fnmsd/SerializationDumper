@@ -1,15 +1,11 @@
 package nb.deser;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Random;
+
 import nb.deser.support.ClassDataDesc;
 import nb.deser.support.ClassDetails;
 import nb.deser.support.ClassField;
@@ -29,7 +25,9 @@ public class SerializationDumper {
 	private int _handleValue;											//The current handle value
 	private final ArrayList<ClassDataDesc> _classDataDescriptions;		//Array of all class data descriptions to use with TC_REFERENCE classDesc elements
 	private boolean _enablePrinting;									//Flag to control console printing (used when rebuilding to test a rebuilt serialization stream)
-	
+	private boolean isTemplatesImpl = false;
+	private boolean isbytecodes =false;
+	private ArrayList<Byte> _temp_bytecodes = new ArrayList<Byte>();
 	/*******************
 	 * Converts the command line parameter to an ArrayList of bytes and sends
 	 * them for parsing.
@@ -52,6 +50,8 @@ public class SerializationDumper {
 			System.out.println("");
 			System.out.println("Rebuild a dumped stream:");
 			System.out.println("\tSerializationDumper -b <input-file> <output-file>");
+			System.out.println("remarks:");
+			System.out.println("\tOrignal from NickstaDB,Modified by fnmsd with dump bytecodes for TemplatesImpl Gadget");
 			return;
 		}
 		
@@ -870,9 +870,12 @@ public class SerializationDumper {
 			for(classIndex = cdd.getClassCount() - 1; classIndex >= 0; --classIndex) {
 				//Get the class details
 				cd = cdd.getClassDetails(classIndex);
-				
+				isTemplatesImpl = false;
 				//Print the class name and indent
 				this.print(cd.getClassName());
+				if(cd.getClassName().endsWith(".TemplatesImpl")){
+					isTemplatesImpl=true;
+				}
 				this.increaseIndent();
 				
 				//Read the field values if the class is SC_SERIALIZABLE
@@ -926,13 +929,16 @@ public class SerializationDumper {
 	 * 
 	 * The data type depends on the given field description.
 	 * 
-	 * @param f A description of the field data to read.
+	 * @param cf A description of the field data to read.
 	 ******************/
 	private void readClassDataField(ClassField cf) {
 		byte b1, b2, b3, b4, b5, b6, b7, b8;
-		
+		isbytecodes=false;
 		//Print the field name and indent
 		this.print(cf.getName());
+		if(cf.getName().equals("_bytecodes")){
+			isbytecodes=true;
+		}
 		this.increaseIndent();
 		
 		//Read the field data
@@ -1040,6 +1046,10 @@ public class SerializationDumper {
 		//Array data
 		this.print("Values");
 		this.increaseIndent();
+		//fnmsd:ModifyHere
+		if(isTemplatesImpl&&isbytecodes) {
+			_temp_bytecodes = new ArrayList<Byte>();
+		}
 		for(int i = 0; i < size; ++i) {
 			//Print element index
 			this.print("Index " + i + ":");
@@ -1050,6 +1060,28 @@ public class SerializationDumper {
 			
 			//Revert indent
 			this.decreaseIndent();
+		}
+		if(isTemplatesImpl&&isbytecodes&&cd.getClassName().charAt(1)=='B') {
+			try {
+				String fileName=new Random().nextLong() + ".class";
+				System.err.println("Write bytecodes to File:"+fileName);
+				FileOutputStream FOS = new FileOutputStream(fileName);
+
+
+				byte[] output = new byte[_temp_bytecodes.size()];
+				Iterator<Byte> iterator = _temp_bytecodes.iterator();
+				int i = 0;
+				while (iterator.hasNext()) {
+					output[i++] = iterator.next().byteValue();
+				}
+
+				FOS.write(output);
+				FOS.close();
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		}
 		this.decreaseIndent();
 		
@@ -1366,7 +1398,11 @@ public class SerializationDumper {
 	 * Read a byte field.
 	 ******************/
 	private void readByteField() {
+		//fnmsd:ModifyHere
 		byte b1 = this._data.pop();
+		if(isTemplatesImpl&&isbytecodes) {
+			_temp_bytecodes.add(b1);
+		}
 		if(((int)b1) >= 0x20 && ((int)b1) <= 0x7e) {
 			//Print with ASCII
 			this.print("(byte)" + b1 + " (ASCII: " + ((char)b1) + ") - 0x" + this.byteToHex(b1));

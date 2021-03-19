@@ -1,4 +1,9 @@
 # SerializationDumper
+
+A Modify version for Dump bytecodes from TemplatesImpl Gadget
+
+用于导出TemplatesImpl类Gadget中的bytecodes的修改版。
+
 A tool to dump and rebuild Java serialization streams and Java RMI packet contents in a more human readable form.
 
 The tool does not deserialize the stream (i.e. objects in the stream are not instantiated), so it does not require access to the classes that were used in the stream*.
